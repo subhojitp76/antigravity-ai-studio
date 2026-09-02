@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Model checkpoints & binary weights (Download separately from Hugging Face)
+llama-3.2-3b-ov/
+*.bin
+*.blob
+*.onnx
+
+# Data & vector index persistence
+data/
+documents/
+
+# Logs and scratch files
+*.log
+scratch/
+.system_generated/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
