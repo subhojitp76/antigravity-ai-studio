@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenVINO NPU & LM Studio Multi-Workspace RAG Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+  <div class="app-container">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="app-header">
+      <div class="header-left">
+        <button id="sidebarToggleBtn" class="icon-btn" title="Toggle Sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div class="brand">
+          <div class="brand-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </div>
+          <div class="brand-info">
+            <span class="brand-title">Antigravity AI Studio</span>
+            <span class="brand-subtitle" id="activeWorkspaceBadge">General Workspace</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- HARDWARE & MODEL CONTROLS -->
+      <div class="header-center">
+        <!-- Engine Switcher -->
+        <div class="engine-switcher">
+          <button type="button" class="engine-pill active" id="engineOpenVinoBtn" data-engine="openvino">
+            <span class="engine-icon">⚡</span>
+            <span>OpenVINO (NPU)</span>
+          </button>
+          <button type="button" class="engine-pill" id="engineLMStudioBtn" data-engine="lmstudio">
+            <span class="engine-icon">🦙</span>
+            <span>LM Studio</span>
+          </button>
+        </div>
+
+        <!-- OpenVINO Controls -->
+        <div id="openvinoControlGroup" class="engine-control-group">
+          <div class="device-pill-group">
+            <label class="device-label" for="deviceSelect">Device:</label>
+            <div class="custom-select-wrap">
+              <select id="deviceSelect" class="device-select">
+                <option value="NPU" selected>Intel NPU (AI Boost)</option>
+                <option value="CPU">Intel Core Ultra CPU</option>
+                <option value="GPU.0">Intel Graphics (iGPU)</option>
+                <option value="GPU.1">NVIDIA RTX 5070 Ti (dGPU)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="model-action-wrap">
+            <button id="modelActionBtn" class="btn btn-start">
+              <span class="btn-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              </span>
+              <span class="btn-text">Start Model</span>
+            </button>
+          </div>
+
+          <!-- MODEL STATUS BADGE -->
+          <div id="modelStatusBadge" class="status-badge unloaded">
+            <span class="status-dot"></span>
+            <span class="status-text" id="statusText">Unloaded</span>
+            <span class="loading-timer" id="loadingTimer" style="display: none;">(0.0s)</span>
+          </div>
+        </div>
+
+        <!-- LM Studio Controls -->
+        <div id="lmstudioControlGroup" class="engine-control-group" style="display: none;">
+          <div class="device-pill-group">
+            <label class="device-label" for="lmStudioModelSelect">Model:</label>
+            <div class="custom-select-wrap">
+              <select id="lmStudioModelSelect" class="device-select" style="max-width: 220px;">
+                <option value="">Loading LM Studio models...</option>
+              </select>
+            </div>
+            <button type="button" id="refreshLMStudioBtn" class="icon-btn-inline" title="Refresh LM Studio Models">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+
+          <!-- LM STUDIO STATUS BADGE -->
+          <div id="lmStudioStatusBadge" class="status-badge ready">
+            <span class="status-dot"></span>
+            <span class="status-text" id="lmStudioStatusText">Connected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SYSTEM METRICS & ACTIONS -->
+      <div class="header-right">
+        <div class="telemetry-bar" id="telemetryBar" title="System Hardware Usage">
+          <div class="telemetry-item">
+            <span class="tel-label">RAM</span>
+            <span class="tel-value" id="ramMetric">--</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="tel-label">CPU</span>
+            <span class="tel-value" id="cpuMetric">--</span>
+          </div>
+          <div class="telemetry-item highlight">
+            <span class="tel-label">TPS</span>
+            <span class="tel-value" id="lastTpsMetric">0.0</span>
+          </div>
+        </div>
+
+        <button id="soundToggleBtn" class="icon-btn" title="Toggle Sound Feedback">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="soundIcon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+        </button>
+
+        <button id="settingsModalBtn" class="icon-btn" title="NPU & Model Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <!-- SIDEBAR WITH 3 WORKSPACE SECTIONS -->
+      <aside class="app-sidebar" id="appSidebar">
+        <!-- 3 MAIN WORKSPACE TABS -->
+        <div class="workspace-tabs">
+          <button class="ws-tab-btn active" id="tabDirectChatBtn" data-tab="chat">
+            <span class="tab-icon">💬</span>
+            <span>Chat</span>
+          </button>
+          <button class="ws-tab-btn" id="tabProjectsBtn" data-tab="projects">
+            <span class="tab-icon">📁</span>
+            <span>Projects</span>
+          </button>
+          <button class="ws-tab-btn" id="tabHistoryBtn" data-tab="history">
+            <span class="tab-icon">🕒</span>
+            <span>History</span>
+          </button>
+        </div>
+
+        <!-- TAB 1: DIRECT CHAT VIEW -->
+        <div id="viewDirectChat" class="sidebar-tab-view active">
+          <!-- Session Header / Active Chat -->
+          <div class="sidebar-section">
+            <div class="section-title">
+              <span>Active Chat</span>
+              <button id="newDirectChatBtn" class="btn-small" title="Start new conversation">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                New Chat
+              </button>
+            </div>
+            <div class="session-info-card">
+              <div class="session-title-wrap">
+                <span class="session-title-label" id="currentSessionTitle">General Chat</span>
+              </div>
+              <div class="session-meta-row">
+                <span class="session-badge" id="currentSessionWorkspace">Workspace: General</span>
+                <span class="session-badge" id="currentSessionEngine">Engine: OpenVINO</span>
+              </div>
+            </div>
+            
+            <div class="sidebar-btn-group" style="margin-top: 10px;">
+              <button id="saveChatBtn" class="btn-outline" title="Save current chat transcript">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                Save
+              </button>
+              <button id="clearChatBtn" class="btn-outline danger" title="Clear current messages">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Clear
+              </button>
+              <button id="exportChatBtn" class="btn-outline" title="Export as Markdown">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export
+              </button>
+            </div>
+          </div>
+
+          <!-- RAG Status in Direct Chat -->
+          <div class="sidebar-section">
+            <div class="section-title">
+              <span>📚 Project Knowledge Base</span>
+              <span class="rag-badge" id="ragStatusBadge">Active</span>
+            </div>
+            <!-- RAG Toggle -->
+            <div class="rag-toggle-card">
+              <div class="rag-toggle-info">
+                <label for="ragToggle" class="rag-toggle-title">RAG Context Injection</label>
+                <div class="rag-toggle-desc">Use active project's indexed files</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="ragToggle" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+
+            <!-- Top-K Slider -->
+            <div class="param-control" style="margin-top: 10px;">
+              <div class="param-header">
+                <label for="topKSlider">Top-K Context Chunks</label>
+                <span id="topKValue" class="param-val">3</span>
+              </div>
+              <input type="range" id="topKSlider" min="1" max="6" step="1" value="3">
+            </div>
+          </div>
+
+          <!-- GENERATION PARAMETERS -->
+          <div class="sidebar-section">
+            <div class="section-title">Generation Parameters</div>
+
+            <div class="param-control">
+              <div class="param-header">
+                <label for="temperatureSlider">Temperature</label>
+                <span id="tempValue" class="param-val">0.7</span>
+              </div>
+              <input type="range" id="temperatureSlider" min="0.0" max="1.5" step="0.05" value="0.7">
+              <div class="param-desc">0 = deterministic, 1.0+ = creative</div>
+            </div>
+
+            <div class="param-control">
+              <div class="param-header">
+                <label for="maxTokensSlider">Max New Tokens</label>
+                <span id="maxTokensValue" class="param-val">512</span>
+              </div>
+              <input type="range" id="maxTokensSlider" min="64" max="2048" step="64" value="512">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: PROJECTS WORKSPACE VIEW -->
+        <div id="viewProjects" class="sidebar-tab-view">
+          <!-- Active Project Selector & Creator -->
+          <div class="sidebar-section">
+            <div class="section-title">
+              <span>Project Workspace</span>
+              <button id="createProjectModalBtn" class="btn-small" title="Create a new project workspace">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                New Project
+              </button>
+            </div>
+
+            <div class="project-select-card">
+              <label for="projectSelector" class="project-label">Select Active Project:</label>
+              <div class="custom-select-wrap">
+                <select id="projectSelector" class="device-select">
+                  <option value="default">General Workspace</option>
+                </select>
+              </div>
+              <div class="project-desc-display" id="projectDescText">Default workspace for general chat.</div>
+            </div>
+          </div>
+
+          <!-- Project Documents (RAG) -->
+          <div class="sidebar-section">
+            <div class="section-title">
+              <span>📄 Project Documents (<span id="docCount">0</span>)</span>
+              <button id="clearDocsBtn" class="btn-link" title="Clear all documents from this project">Clear All</button>
+            </div>
+
+            <!-- File Upload Dropzone -->
+            <label for="fileUploadInput" class="upload-dropzone" id="uploadDropzone" title="Upload documents to this Project" tabindex="0" role="button">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              <div class="dropzone-text">Drop Files into Project</div>
+              <div class="dropzone-sub">PDF, TXT, MD, CSV, JSON, Code</div>
+            </label>
+            <input type="file" id="fileUploadInput" multiple accept=".txt,.md,.pdf,.csv,.json,.py,.js,.ts,.html,.css,.cpp,.c,.h,.rs,.java,.log,.yaml,.yml,.xml,text/*,application/pdf" style="position: fixed; top: -9999px; left: -9999px; opacity: 0; pointer-events: none;">
+
+            <!-- Uploaded Documents List -->
+            <div id="documentsList" class="documents-list">
+              <div class="empty-docs-msg">No documents in this project yet.</div>
+            </div>
+          </div>
+
+          <!-- Project Actions (Close & Memorize Chat) -->
+          <div class="sidebar-section">
+            <div class="section-title">
+              <span>🧠 Knowledge Memorization</span>
+            </div>
+            <p class="memorize-hint">Finish conversation and distill insights into this project's permanent knowledge base.</p>
+            <button id="memorizeChatBtn" class="btn btn-memorize">
+              <span class="btn-icon">🧠</span>
+              <span class="btn-text">Distill & Memorize Chat</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 3: CHAT HISTORY VIEW -->
+        <div id="viewHistory" class="sidebar-tab-view">
+          <div class="sidebar-section">
+            <div class="section-title">
+              <span>Past Conversations</span>
+              <span class="history-count" id="historyCountBadge">0</span>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="history-search-wrap">
+              <input type="text" id="historySearchInput" placeholder="Search conversations..." class="history-search-input">
+            </div>
+
+            <!-- Sessions List -->
+            <div id="historySessionsList" class="history-sessions-list">
+              <div class="empty-docs-msg">No saved conversations yet.</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN CHAT AREA -->
+      <main class="chat-main" id="chatMain">
+        <!-- GLOBAL DRAG & DROP OVERLAY -->
+        <div id="globalDragOverlay" class="global-drag-overlay">
+          <div class="drag-overlay-box">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <div class="drag-overlay-title">Drop Files to Ingest into Knowledge Base</div>
+            <div class="drag-overlay-sub">Automatic parsing, chunking & vector indexing</div>
+          </div>
+        </div>
+
+        <!-- MESSAGES CONTAINER -->
+        <div class="messages-container" id="messagesContainer">
+          <!-- WELCOME SCREEN -->
+          <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-icon">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            </div>
+            <h1 class="welcome-title">Antigravity AI Studio</h1>
+            <p class="welcome-desc">
+              Multi-workspace studio supporting <strong>OpenVINO™ (Intel NPU)</strong> and <strong>LM Studio</strong> with Project-Scoped RAG and Persistent Chat History.
+            </p>
+
+            <div class="feature-grid">
+              <div class="feature-card clickable" id="cardNPU" title="Click to activate OpenVINO NPU mode">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-name">Intel NPU Acceleration</div>
+                <div class="feature-detail">Zero-CPU hardware inference using OpenVINO GenAI</div>
+              </div>
+              <div class="feature-card clickable" id="cardLMStudio" title="Click to switch to LM Studio">
+                <div class="feature-icon">🦙</div>
+                <div class="feature-name">LM Studio Models</div>
+                <div class="feature-detail">DeepSeek-R1, Gemma-4, Qwen local LLM inference</div>
+              </div>
+              <div class="feature-card clickable" id="cardProjects" title="Click to open Projects Workspace">
+                <div class="feature-icon">📁</div>
+                <div class="feature-name">Project-Scoped RAG</div>
+                <div class="feature-detail">Isolated document stores with citations and memorization</div>
+              </div>
+              <div class="feature-card clickable" id="cardHistory" title="Click to view Chat History">
+                <div class="feature-icon">🕒</div>
+                <div class="feature-name">Persistent Chat History</div>
+                <div class="feature-detail">Continue previous multi-turn threads seamlessly</div>
+              </div>
+            </div>
+
+            <div class="welcome-prompts-row" style="display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; justify-content: center;">
+              <button type="button" class="starter-tag" data-prompt="Hello! Which models and hardware accelerators are currently available?">🤖 Available Models & Hardware?</button>
+              <button type="button" class="starter-tag" data-prompt="Explain how Project-Scoped RAG and safe memorization works.">📚 How does Project RAG work?</button>
+              <button type="button" class="starter-tag" data-prompt="Write a Python script for testing local LLM throughput and latency.">⚡ Benchmark Python Script</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIVE STREAMING METRICS BAR -->
+        <div class="stream-telemetry-bar" id="streamTelemetryBar" style="display: none;">
+          <div class="stream-metric">
+            <span class="sm-label">Engine:</span>
+            <span class="sm-val" id="smEngine">OpenVINO</span>
+          </div>
+          <div class="stream-metric">
+            <span class="sm-label">Live TPS:</span>
+            <span class="sm-val highlight" id="smLiveTps">0.0</span>
+          </div>
+          <div class="stream-metric">
+            <span class="sm-label">TTFT:</span>
+            <span class="sm-val" id="smTtft">0ms</span>
+          </div>
+          <div class="stream-metric">
+            <span class="sm-label">Tokens:</span>
+            <span class="sm-val" id="smTokens">0</span>
+          </div>
+          <button id="stopGenerationBtn" class="btn-stop-stream" title="Stop Generation">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
+            Stop
+          </button>
+        </div>
+
+        <!-- CHAT INPUT CONTAINER -->
+        <div class="chat-input-wrapper">
+          <!-- Citations Preview Strip -->
+          <div class="citations-preview-strip" id="citationsPreviewStrip" style="display: none;">
+            <div class="citations-header">
+              <span>📚 Retrieved Citations (<span id="citationCount">0</span>):</span>
+              <button id="closeCitationsBtn" class="btn-close-strip">&times;</button>
+            </div>
+            <div class="citation-pills-list" id="citationPillsList"></div>
+          </div>
+
+          <form class="chat-form" id="chatForm">
+            <div class="input-actions-left">
+              <!-- ATTACH FILE BUTTON (Label targeting hidden native input) -->
+              <label for="fileUploadInput" class="icon-btn-chat" id="attachFileBtn" title="Attach documents to Project Knowledge Base" tabindex="0" role="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+              </label>
+            </div>
+
+            <textarea 
+              id="chatInput" 
+              class="chat-textarea" 
+              placeholder="Ask a question, query project documents, or brainstorm..." 
+              rows="1"
+              autofocus
+            ></textarea>
+
+            <div class="input-actions-right">
+              <button type="submit" id="sendBtn" class="btn-send" title="Send message (Enter)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </div>
+          </form>
+          <div class="input-hint">
+            <span>Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for new line. Active: <span id="hintWorkspace">General Workspace</span></span>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- MODAL 1: CREATE NEW PROJECT -->
+    <div class="modal-backdrop" id="newProjectModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">📁 Create New Project Workspace</h2>
+          <button class="modal-close-btn" id="closeNewProjectModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="newProjectName">Project Name *</label>
+            <input type="text" id="newProjectName" class="form-input" placeholder="e.g. Quantum Vortex Research, Financial Analysis 2026">
+          </div>
+          <div class="form-group">
+            <label for="newProjectDesc">Description</label>
+            <textarea id="newProjectDesc" class="form-input" rows="2" placeholder="Brief summary of what this project covers..."></textarea>
+          </div>
+          <div class="modal-tip">
+            💡 Each project gets its own isolated document knowledge base, vector index, and chat history.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="cancelNewProjectBtn">Cancel</button>
+          <button class="btn btn-primary" id="confirmCreateProjectBtn">Create Project</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: SAFE CHAT MEMORIZATION / DISTILLATION -->
+    <div class="modal-backdrop" id="memorizeModal" style="display: none;">
+      <div class="modal-card modal-large">
+        <div class="modal-header">
+          <h2 class="modal-title">🧠 Memorize Conversation into Project</h2>
+          <button class="modal-close-btn" id="closeMemorizeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            Convert this conversation's key insights into permanent reference material for <strong id="memorizeProjectName">General Workspace</strong>.
+            Review and edit the distilled summary below to ensure high accuracy:
+          </p>
+          <div class="form-group">
+            <label for="memorizeSummaryText">Distilled Knowledge Summary (Editable Markdown)</label>
+            <textarea id="memorizeSummaryText" class="form-input code-font" rows="12" placeholder="Generating distilled summary..."></textarea>
+          </div>
+          <div class="modal-alert">
+            🛡️ <strong>Hallucination Protection:</strong> Conversational filler has been stripped. Review the text above to ensure all facts are accurate before indexing.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="cancelMemorizeBtn">Skip / Close</button>
+          <button class="btn btn-primary btn-memorize-confirm" id="confirmMemorizeBtn">
+            <span>🧠 Save to Project Knowledge Base</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: HARDWARE & NPU SETTINGS -->
+    <div class="modal-backdrop" id="settingsModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">⚙️ Hardware & OpenVINO Settings</h2>
+          <button class="modal-close-btn" id="closeSettingsModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="settingMaxPromptLen">NPU MAX_PROMPT_LEN</label>
+            <input type="number" id="settingMaxPromptLen" class="form-input" value="1024" step="256">
+            <span class="field-hint">KV-Cache compilation buffer size for prompt tokens.</span>
+          </div>
+          <div class="form-group">
+            <label for="settingMinResponseLen">NPU MIN_RESPONSE_LEN</label>
+            <input type="number" id="settingMinResponseLen" class="form-input" value="512" step="128">
+            <span class="field-hint">Reserved generation buffer size on NPU.</span>
+          </div>
+          <div class="form-group">
+            <label for="settingGenerateHint">GENERATE_HINT</label>
+            <select id="settingGenerateHint" class="form-input">
+              <option value="BEST_PERF" selected>BEST_PERF (Maximum Throughput)</option>
+              <option value="LOW_LATENCY">LOW_LATENCY (Faster TTFT)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="cancelSettingsBtn">Cancel</button>
+          <button class="btn btn-primary" id="saveSettingsBtn">Apply & Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toastContainer" class="toast-container"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
