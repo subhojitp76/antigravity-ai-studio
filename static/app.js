@@ -21,7 +21,12 @@ const state = {
   messages: [],                   // [{role: 'user'|'assistant', text: '...', citations: [], timestamp: ...}]
   projects: [],
   sessions: [],
-  audioContext: null
+  audioContext: null,
+  // NPU Wizard State
+  npuCurrentStep: 1,
+  npuDiagnostics: null,
+  npuCatalog: [],
+  npuDownloadInterval: null
 };
 
 // DOM Elements Map
@@ -140,7 +145,47 @@ const dom = {
   temperatureSlider: document.getElementById('temperatureSlider'),
   tempValue: document.getElementById('tempValue'),
   maxTokensSlider: document.getElementById('maxTokensSlider'),
-  maxTokensValue: document.getElementById('maxTokensValue')
+  maxTokensValue: document.getElementById('maxTokensValue'),
+
+  // Guided NPU Setup Wizard Elements
+  npuSetupWizardBtn: document.getElementById('npuSetupWizardBtn'),
+  npuWizardModal: document.getElementById('npuWizardModal'),
+  closeNpuWizardModal: document.getElementById('closeNpuWizardModal'),
+  closeNpuWizardBtn: document.getElementById('closeNpuWizardBtn'),
+  wizardTabs: document.querySelectorAll('.wizard-tab'),
+  wizardStepViews: document.querySelectorAll('.wizard-step-view'),
+  wizardPrevBtn: document.getElementById('wizardPrevBtn'),
+  wizardNextBtn: document.getElementById('wizardNextBtn'),
+  wizardFinishBtn: document.getElementById('wizardFinishBtn'),
+  diagHwCard: document.getElementById('diagHwCard'),
+  diagHwBadge: document.getElementById('diagHwBadge'),
+  diagHwDetail: document.getElementById('diagHwDetail'),
+  diagDriverCard: document.getElementById('diagDriverCard'),
+  diagDriverBadge: document.getElementById('diagDriverBadge'),
+  diagDriverDetail: document.getElementById('diagDriverDetail'),
+  diagOvBadge: document.getElementById('diagOvBadge'),
+  diagOvDetail: document.getElementById('diagOvDetail'),
+  driverGuideBox: document.getElementById('driverGuideBox'),
+  recheckHwBtn: document.getElementById('recheckHwBtn'),
+  downloadProgressCard: document.getElementById('downloadProgressCard'),
+  dpcModelName: document.getElementById('dpcModelName'),
+  dpcStatusText: document.getElementById('dpcStatusText'),
+  dpcPctText: document.getElementById('dpcPctText'),
+  dpcProgressBar: document.getElementById('dpcProgressBar'),
+  dpcBytesText: document.getElementById('dpcBytesText'),
+  dpcSpeedText: document.getElementById('dpcSpeedText'),
+  modelCatalogGrid: document.getElementById('modelCatalogGrid'),
+  customModelPathInput: document.getElementById('customModelPathInput'),
+  validateCustomPathBtn: document.getElementById('validateCustomPathBtn'),
+  customPathFeedback: document.getElementById('customPathFeedback'),
+  testActiveModelPath: document.getElementById('testActiveModelPath'),
+  runNpuTestBtn: document.getElementById('runNpuTestBtn'),
+  testResultBox: document.getElementById('testResultBox'),
+  testCompileTime: document.getElementById('testCompileTime'),
+  testDevice: document.getElementById('testDevice'),
+  testGenTime: document.getElementById('testGenTime'),
+  testOutputText: document.getElementById('testOutputText'),
+  testSuccessBanner: document.getElementById('testSuccessBanner')
 };
 
 // =============================================================================
@@ -156,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGlobalDragAndDrop();
   initChatInterface();
   initModals();
+  initNpuWizard();
   initTelemetryPolling();
   
   // Initial data fetches
@@ -163,6 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchDocuments();
   fetchDevices();
   pollEngineStatus();
+  fetchNpuDiagnosticsQuiet();
 });
 
 // =============================================================================
@@ -505,7 +552,7 @@ function renderHistoryList(filterQuery = '') {
         </button>
       </div>
       <div class="history-snippet">${escapeHtml(sess.last_snippet || 'No message preview')}</div>
-      <div class="footer-row">
+      <div class="history-footer-row">
         <span class="history-proj-tag">${escapeHtml(sess.project_name || 'General')}</span>
         <span class="history-date">${dateStr}</span>
       </div>
@@ -834,7 +881,12 @@ function initChatInterface() {
   // Welcome Screen Feature Cards Click Handlers
   document.getElementById('cardNPU')?.addEventListener('click', () => {
     switchEngine('openvino');
-    showToast('Switched to OpenVINO (Intel NPU). Click "Start Model" if unloaded.', 'info');
+    if (state.modelStatus === 'ready') {
+      showToast('Switched to OpenVINO (Intel NPU). Model is active!', 'success');
+    } else {
+      showToast('Switched to OpenVINO (Intel NPU). Click "Start Model" or launch NPU Setup.', 'info');
+      openNpuWizard();
+    }
   });
 
   document.getElementById('cardLMStudio')?.addEventListener('click', () => {
@@ -1170,8 +1222,26 @@ async function handleModelAction() {
       const data = await res.json();
       if (data.success) {
         showToast(`Compiling model on ${device}...`, 'info');
+      } else {
+        dom.modelStatusBadge.className = 'status-badge unloaded';
+        dom.statusText.textContent = 'Unloaded';
+        dom.modelActionBtn.disabled = false;
+
+        // Proactive Guided Setup Interception
+        if (data.code === 'needs_driver') {
+          showToast(data.message, 'error');
+          openNpuWizard(1);
+        } else if (data.code === 'needs_model') {
+          showToast(data.message, 'error');
+          openNpuWizard(2);
+        } else {
+          showToast(data.message || 'Failed to start model.', 'error');
+        }
       }
     } catch (err) {
+      dom.modelStatusBadge.className = 'status-badge error';
+      dom.statusText.textContent = 'Error';
+      dom.modelActionBtn.disabled = false;
       showToast(`Error starting model: ${err}`, 'error');
     }
   } else if (state.modelStatus === 'ready') {
@@ -1413,4 +1483,452 @@ function formatMarkdown(text) {
   html = html.replace(/\n/g, '<br>');
 
   return html;
+}
+
+// =============================================================================
+// 10. GUIDED INTEL NPU SETUP WIZARD CONTROLLER
+// =============================================================================
+
+function initNpuWizard() {
+  // Launch button in Header
+  dom.npuSetupWizardBtn?.addEventListener('click', () => openNpuWizard());
+
+  // Close buttons
+  dom.closeNpuWizardModal?.addEventListener('click', closeNpuWizard);
+  dom.closeNpuWizardBtn?.addEventListener('click', closeNpuWizard);
+
+  // Step Navigation Tabs
+  dom.wizardTabs?.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const step = parseInt(tab.getAttribute('data-step') || 1);
+      goToWizardStep(step);
+    });
+  });
+
+  // Next & Back Buttons
+  dom.wizardNextBtn?.addEventListener('click', () => {
+    if (state.npuCurrentStep < 4) {
+      goToWizardStep(state.npuCurrentStep + 1);
+    }
+  });
+
+  dom.wizardPrevBtn?.addEventListener('click', () => {
+    if (state.npuCurrentStep > 1) {
+      goToWizardStep(state.npuCurrentStep - 1);
+    }
+  });
+
+  dom.wizardFinishBtn?.addEventListener('click', async () => {
+    closeNpuWizard();
+    await switchEngine('openvino');
+    dom.modelActionBtn?.click();
+    showToast('Starting OpenVINO model on Intel NPU...', 'info');
+  });
+
+  // Refresh hardware check button
+  dom.recheckHwBtn?.addEventListener('click', async () => {
+    showToast('Re-scanning hardware devices...', 'info');
+    await fetchNpuDiagnostics();
+  });
+
+  // Custom Model Path Validation
+  dom.validateCustomPathBtn?.addEventListener('click', validateCustomModelPath);
+
+  // NPU Hardware Pipeline Test Runner
+  dom.runNpuTestBtn?.addEventListener('click', runNpuPipelineTest);
+
+  // Copy code buttons in CLI Step
+  document.querySelectorAll('.btn-copy-code').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-copy');
+      if (text) {
+        navigator.clipboard.writeText(text);
+        const origText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.color = '#34d399';
+        setTimeout(() => {
+          btn.textContent = origText;
+          btn.style.color = '';
+        }, 1800);
+      }
+    });
+  });
+}
+
+async function openNpuWizard(targetStep = null) {
+  dom.npuWizardModal.style.display = 'flex';
+  await fetchNpuDiagnostics();
+  await fetchNpuCatalog();
+
+  if (targetStep) {
+    goToWizardStep(targetStep);
+  } else {
+    // Smart starting step
+    if (state.npuDiagnostics && state.npuDiagnostics.hardware && !state.npuDiagnostics.hardware.has_npu) {
+      goToWizardStep(1); // Needs driver/hardware check
+    } else if (state.npuDiagnostics && state.npuDiagnostics.active_model && !state.npuDiagnostics.active_model.details.is_valid) {
+      goToWizardStep(2); // Needs model acquisition
+    } else {
+      goToWizardStep(1);
+    }
+  }
+}
+
+function closeNpuWizard() {
+  dom.npuWizardModal.style.display = 'none';
+  if (state.npuDownloadInterval) {
+    clearInterval(state.npuDownloadInterval);
+    state.npuDownloadInterval = null;
+  }
+}
+
+function goToWizardStep(stepNum) {
+  state.npuCurrentStep = stepNum;
+
+  // Update tabs
+  dom.wizardTabs?.forEach(tab => {
+    const s = parseInt(tab.getAttribute('data-step') || 1);
+    tab.classList.toggle('active', s === stepNum);
+  });
+
+  // Update step views
+  dom.wizardStepViews?.forEach((view, idx) => {
+    view.classList.toggle('active', idx + 1 === stepNum);
+  });
+
+  // Update footer button states
+  if (dom.wizardPrevBtn) {
+    dom.wizardPrevBtn.style.display = stepNum > 1 ? 'inline-flex' : 'none';
+  }
+
+  if (dom.wizardNextBtn && dom.wizardFinishBtn) {
+    if (stepNum === 3) {
+      dom.wizardNextBtn.style.display = 'inline-flex';
+      dom.wizardFinishBtn.style.display = 'inline-flex';
+    } else if (stepNum === 4) {
+      dom.wizardNextBtn.style.display = 'none';
+      dom.wizardFinishBtn.style.display = 'inline-flex';
+    } else {
+      dom.wizardNextBtn.style.display = 'inline-flex';
+      dom.wizardFinishBtn.style.display = 'none';
+    }
+  }
+
+  if (stepNum === 2) {
+    fetchNpuCatalog();
+  } else if (stepNum === 3) {
+    if (dom.testActiveModelPath && state.npuDiagnostics) {
+      dom.testActiveModelPath.textContent = state.npuDiagnostics.active_model.configured_path;
+    }
+  }
+}
+
+async function fetchNpuDiagnosticsQuiet() {
+  try {
+    const res = await fetch('/api/npu/diagnostics');
+    const data = await res.json();
+    state.npuDiagnostics = data;
+    if (dom.npuSetupWizardBtn) {
+      if (data.overall_ready) {
+        dom.npuSetupWizardBtn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        dom.npuSetupWizardBtn.style.color = '#34d399';
+      } else {
+        dom.npuSetupWizardBtn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        dom.npuSetupWizardBtn.style.color = '#fbbf24';
+      }
+    }
+  } catch (e) {}
+}
+
+async function fetchNpuDiagnostics() {
+  try {
+    const res = await fetch('/api/npu/diagnostics');
+    const data = await res.json();
+    state.npuDiagnostics = data;
+    renderNpuDiagnostics(data);
+  } catch (err) {
+    console.error('Failed to fetch NPU diagnostics:', err);
+  }
+}
+
+function renderNpuDiagnostics(diag) {
+  if (!diag || !diag.hardware) return;
+
+  const hw = diag.hardware;
+
+  // Hardware Card
+  if (hw.has_npu) {
+    dom.diagHwBadge.className = 'diag-status-badge success';
+    dom.diagHwBadge.textContent = 'Detected';
+    dom.diagHwDetail.textContent = `${hw.npu_name} available in OpenVINO registry.`;
+  } else {
+    dom.diagHwBadge.className = 'diag-status-badge error';
+    dom.diagHwBadge.textContent = 'Not Found';
+    dom.diagHwDetail.textContent = 'NPU device is not exposed to OpenVINO.';
+  }
+
+  // Driver Card
+  if (hw.has_npu) {
+    dom.diagDriverBadge.className = 'diag-status-badge success';
+    dom.diagDriverBadge.textContent = 'Active';
+    dom.diagDriverDetail.textContent = 'Driver initialized & responsive.';
+    dom.driverGuideBox.style.display = 'none';
+  } else {
+    dom.diagDriverBadge.className = 'diag-status-badge warning';
+    dom.diagDriverBadge.textContent = 'Driver Needed';
+    dom.diagDriverDetail.textContent = 'Intel AI Boost driver required.';
+    dom.driverGuideBox.style.display = 'flex';
+  }
+
+  // OpenVINO Card
+  if (hw.openvino_installed) {
+    dom.diagOvBadge.className = 'diag-status-badge success';
+    dom.diagOvBadge.textContent = `v${hw.openvino_version ? hw.openvino_version.split('-')[0] : 'Installed'}`;
+    dom.diagOvDetail.textContent = 'OpenVINO GenAI runtime loaded.';
+  } else {
+    dom.diagOvBadge.className = 'diag-status-badge error';
+    dom.diagOvBadge.textContent = 'Missing';
+    dom.diagOvDetail.textContent = 'openvino-genai package not found.';
+  }
+
+  // Update test active model label
+  if (dom.testActiveModelPath && diag.active_model) {
+    dom.testActiveModelPath.textContent = diag.active_model.configured_path;
+  }
+}
+
+async function fetchNpuCatalog() {
+  try {
+    const res = await fetch('/api/npu/diagnostics');
+    const data = await res.json();
+    state.npuDiagnostics = data;
+    renderNpuCatalog(data.catalog || []);
+  } catch (err) {
+    console.error('Failed to fetch NPU catalog:', err);
+  }
+}
+
+function renderNpuCatalog(catalog) {
+  if (!dom.modelCatalogGrid) return;
+  dom.modelCatalogGrid.innerHTML = '';
+
+  const activePath = state.npuDiagnostics?.active_model?.configured_path || 'llama-3.2-3b-ov';
+
+  catalog.forEach(item => {
+    const card = document.createElement('div');
+    const isThisActive = (item.target_dir === activePath || item.local_path === activePath);
+    card.className = `model-catalog-card ${isThisActive ? 'active-model' : ''}`;
+
+    let badgeClass = 'rec';
+    if (item.badge.includes('Reasoning')) badgeClass = 'reasoning';
+    else if (item.badge.includes('Light')) badgeClass = 'light';
+    else if (item.badge.includes('Math')) badgeClass = 'math';
+
+    let actionBtnHtml = '';
+    if (item.is_installed) {
+      if (isThisActive) {
+        actionBtnHtml = `<button type="button" class="btn-card-action btn-installed" disabled>✓ Active Model</button>`;
+      } else {
+        actionBtnHtml = `<button type="button" class="btn-card-action btn-installed btn-select-model" data-path="${item.target_dir}">Select Active</button>`;
+      }
+    } else {
+      actionBtnHtml = `<button type="button" class="btn-card-action btn-download btn-dl-model" data-id="${item.id}" data-dir="${item.target_dir}">⬇ 1-Click Download</button>`;
+    }
+
+    card.innerHTML = `
+      <div class="card-top-row">
+        <span class="card-title">${escapeHtml(item.name)}</span>
+        <span class="card-badge ${badgeClass}">${escapeHtml(item.badge)}</span>
+      </div>
+      <div class="card-desc">${escapeHtml(item.description)}</div>
+      <div class="card-footer-row">
+        <span class="card-meta">${item.size} • INT4 NPU</span>
+        ${actionBtnHtml}
+      </div>
+    `;
+
+    // 1-Click Download listener
+    const dlBtn = card.querySelector('.btn-dl-model');
+    if (dlBtn) {
+      dlBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startModelDownload(item.id, item.target_dir, item.name);
+      });
+    }
+
+    // Select active model listener
+    const selectBtn = card.querySelector('.btn-select-model');
+    if (selectBtn) {
+      selectBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await setActiveModelPath(item.target_dir);
+      });
+    }
+
+    dom.modelCatalogGrid.appendChild(card);
+  });
+}
+
+async function startModelDownload(modelId, targetDir, modelName) {
+  try {
+    showToast(`Starting 1-Click download for ${modelName || modelId}...`, 'info');
+    dom.downloadProgressCard.style.display = 'flex';
+    dom.dpcModelName.textContent = modelName || modelId;
+    dom.dpcStatusText.textContent = 'Initiating download from Hugging Face...';
+    dom.dpcProgressBar.style.width = '10%';
+    dom.dpcPctText.textContent = '10%';
+
+    const res = await fetch('/api/npu/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model_id: modelId, target_dir: targetDir })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      showToast(data.message || 'Download failed to start.', 'error');
+      dom.downloadProgressCard.style.display = 'none';
+      return;
+    }
+
+    // Start progress polling
+    if (state.npuDownloadInterval) clearInterval(state.npuDownloadInterval);
+    state.npuDownloadInterval = setInterval(pollDownloadStatus, 800);
+  } catch (err) {
+    showToast(`Download error: ${err}`, 'error');
+    dom.downloadProgressCard.style.display = 'none';
+  }
+}
+
+async function pollDownloadStatus() {
+  try {
+    const res = await fetch('/api/npu/download_status');
+    const data = await res.json();
+
+    if (data.status === 'downloading') {
+      dom.dpcStatusText.textContent = data.current_file || 'Downloading weights...';
+      const pct = Math.max(data.progress_pct || 25, 20);
+      dom.dpcProgressBar.style.width = `${pct}%`;
+      dom.dpcPctText.textContent = `${pct}%`;
+      dom.dpcBytesText.textContent = `${data.downloaded_mb || 0} MB downloaded (${data.elapsed_s || 0}s)`;
+    } else if (data.status === 'completed') {
+      clearInterval(state.npuDownloadInterval);
+      state.npuDownloadInterval = null;
+      dom.dpcProgressBar.style.width = '100%';
+      dom.dpcPctText.textContent = '100%';
+      dom.dpcStatusText.textContent = 'Download Complete & Verified!';
+      dom.dpcBytesText.textContent = `${data.downloaded_mb || 'Full'} MB verified on disk.`;
+      
+      showToast(`Model installed successfully!`, 'success');
+      playChime('success');
+
+      // Set as active model and refresh
+      if (data.target_dir) {
+        await setActiveModelPath(data.target_dir);
+      }
+      await fetchNpuCatalog();
+
+      setTimeout(() => {
+        dom.downloadProgressCard.style.display = 'none';
+        goToWizardStep(3); // Go to test step!
+      }, 1500);
+    } else if (data.status === 'error') {
+      clearInterval(state.npuDownloadInterval);
+      state.npuDownloadInterval = null;
+      dom.dpcStatusText.textContent = `Error: ${data.error}`;
+      showToast(`Download failed: ${data.error}`, 'error');
+    }
+  } catch (e) {
+    // Ignore polling errors
+  }
+}
+
+async function setActiveModelPath(modelPath) {
+  try {
+    const res = await fetch('/api/npu/set_model_path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model_path: modelPath })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Active NPU Model set to: ${data.model_name}`, 'success');
+      await fetchNpuDiagnostics();
+      await fetchNpuCatalog();
+    } else {
+      showToast(data.error || 'Failed to set model path.', 'error');
+    }
+  } catch (err) {
+    showToast(`Error setting model path: ${err}`, 'error');
+  }
+}
+
+async function validateCustomModelPath() {
+  const customPath = dom.customModelPathInput.value.trim();
+  if (!customPath) {
+    dom.customPathFeedback.innerHTML = '<span style="color: #f87171;">Please enter a path on disk.</span>';
+    return;
+  }
+
+  dom.customPathFeedback.innerHTML = '<span style="color: var(--accent-cyan);">Validating directory structure...</span>';
+
+  try {
+    const res = await fetch('/api/npu/set_model_path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model_path: customPath })
+    });
+    const data = await res.json();
+    if (data.success) {
+      dom.customPathFeedback.innerHTML = `
+        <span style="color: #34d399;">
+          ✓ Valid OpenVINO IR model (${data.details.total_size_mb} MB) set as active!
+        </span>
+      `;
+      showToast(`Active NPU model updated to: ${customPath}`, 'success');
+      await fetchNpuDiagnostics();
+      await fetchNpuCatalog();
+    } else {
+      dom.customPathFeedback.innerHTML = `
+        <span style="color: #f87171;">
+          ✗ ${escapeHtml(data.error || 'Invalid OpenVINO model directory')}
+        </span>
+      `;
+    }
+  } catch (err) {
+    dom.customPathFeedback.innerHTML = `<span style="color: #f87171;">Error: ${err}</span>`;
+  }
+}
+
+async function runNpuPipelineTest() {
+  const btn = dom.runNpuTestBtn;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-text">Compiling on Intel NPU (AI Boost)...</span>';
+  dom.testResultBox.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/npu/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: 'NPU' })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      dom.testCompileTime.textContent = `${data.compile_duration_s}s`;
+      dom.testDevice.textContent = data.device || 'NPU';
+      dom.testGenTime.textContent = `${data.generation_duration_s}s`;
+      dom.testOutputText.textContent = data.test_output || 'Hello!';
+      dom.testResultBox.style.display = 'flex';
+      playChime('success');
+      showToast('NPU Hardware Test Passed!', 'success');
+    } else {
+      showToast(data.message || data.error || 'NPU test failed.', 'error');
+    }
+  } catch (err) {
+    showToast(`Test execution error: ${err}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="btn-icon">⚡</span><span class="btn-text">Re-run NPU Hardware Test</span>';
+  }
 }
