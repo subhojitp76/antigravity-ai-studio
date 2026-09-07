@@ -1,6 +1,6 @@
 # ⚡ Antigravity AI Studio
 
-> **High-Performance Local LLM & Project-Scoped RAG Studio powered by Intel® OpenVINO™ (NPU / CPU / GPU) and LM Studio.**
+> **High-Performance Local LLM & Project-Scoped RAG Studio powered by Intel® OpenVINO™ (NPU / CPU / GPU) and LM Studio with Guided NPU Setup Wizard.**
 
 [![OpenVINO](https://img.shields.io/badge/Intel-OpenVINO_2025.0-0071C5?style=flat-square&logo=intel&logoColor=white)](https://www.intel.com/content/www/us/en/developer/tools/openvino-toolkit/overview.html)
 [![Hardware](https://img.shields.io/badge/Hardware-Intel_NPU_%7C_CPU_%7C_GPU-00C7FF?style=flat-square)](https://www.intel.com)
@@ -15,7 +15,7 @@
 
 **Antigravity AI Studio** is a unified, privacy-first local AI workstation designed for running Large Language Models with **hardware acceleration on Intel Core Ultra NPUs** and seamless dual-engine integration with **LM Studio**.
 
-It features an isolated **Project-Scoped Retrieval-Augmented Generation (RAG)** architecture, multi-session persistent chat history with sliding-window compaction, and **Safe Conversation Memorization** to prevent hallucination feedback loops.
+It features an isolated **Project-Scoped Retrieval-Augmented Generation (RAG)** architecture, multi-session persistent chat history with sliding-window compaction, **Safe Conversation Memorization**, and a comprehensive **Interactive Intel NPU Setup Wizard** for automated hardware/driver diagnostics and 1-click model downloads.
 
 ```
 +-----------------------------------------------------------------------------------------+
@@ -28,9 +28,10 @@ It features an isolated **Project-Scoped Retrieval-Augmented Generation (RAG)** 
 |   🦙 LM Studio (Port 1234)  |   • Sub-ms TF-IDF Vector Search |   • NPU Sliding Window  |
 |                             |   • Safe Q&A Distillation       |   • Markdown Export     |
 +-----------------------------+---------------------------------+-------------------------+
-|  Hardware Telemetry:        |  Reasoning Support:             |  UI / UX:               |
-|   • Live Tokens/Sec (TPS)   |   • DeepSeek-R1 Thinking Block  |   • Responsive Glass    |
-|   • Real-Time TTFT (ms)     |   • Interactive Citation Pills  |   • Global Drag & Drop  |
+|  Guided NPU Wizard:         |  Reasoning Support:             |  UI / UX:               |
+|   • Driver & Device Check   |   • DeepSeek-R1 Thinking Block  |   • Responsive Glass    |
+|   • 1-Click Model Download  |   • Interactive Citation Pills  |   • Global Drag & Drop  |
+|   • Live Benchmark Test     |   • Live Tokens/Sec & TTFT      |   • Cyberpunk Aesthetic |
 +-----------------------------------------------------------------------------------------+
 ```
 
@@ -38,10 +39,13 @@ It features an isolated **Project-Scoped Retrieval-Augmented Generation (RAG)** 
 
 ## 🚀 Key Features
 
-### 1. ⚡ OpenVINO™ NPU Acceleration
+### 1. ⚡ OpenVINO™ NPU Acceleration & Guided Setup Wizard
 - Native execution on **Intel® AI Boost NPU** via `openvino_genai.LLMPipeline`.
 - Zero CPU/dGPU power draw during generation with static KV-cache optimization (`MAX_PROMPT_LEN: 1024`, `GENERATE_HINT: BEST_PERF`).
-- Support for Intel Core Ultra CPUs, Intel Graphics (iGPU), and NVIDIA RTX dGPUs.
+- **Interactive NPU Setup Wizard**:
+  - **Automated Diagnostics**: Verifies CPU architecture, NPU driver readiness, and OpenVINO runtime status.
+  - **1-Click Model Acquisition Catalog**: Download verified INT4 OpenVINO models (*Llama 3.2 3B*, *DeepSeek-R1 Distill 1.5B*, *TinyLlama 1.1B*, *Phi-4 Mini 3.8B*) directly from Hugging Face with live progress feedback.
+  - **Live Dry-Run Benchmark**: Validates compilation, warm-up latency, and output tokens before starting a full session.
 
 ### 2. 🦙 LM Studio Local Server Integration
 - Connects automatically to local LM Studio instances on `http://127.0.0.1:1234/v1`.
@@ -76,6 +80,12 @@ graph TD
         Router -->|OpenVINO| NPU[Intel NPU / CPU / GPU Pipeline]
         Router -->|LM Studio| LMS[LM Studio REST API :1234]
     end
+
+    subgraph Guided Setup & Diagnostics
+        Server --> Wizard[NPU Setup Wizard & Catalog]
+        Wizard --> HF[Hugging Face Hub Downloader]
+        Wizard --> Diag[Driver & Device Probe]
+    end
     
     subgraph Multi-Workspace Storage
         Server --> PM[Project Manager]
@@ -106,6 +116,7 @@ graph TD
 | **Processor** | Intel® Core™ Ultra (Meteor Lake / Lunar Lake / Arrow Lake) | Intel® Core™ Ultra 7 / 9 with Intel® AI Boost NPU |
 | **RAM** | 16 GB | 32 GB LPDDR5x / DDR5 |
 | **OS** | Windows 11 (64-bit) / Linux (Ubuntu 22.04+) | Windows 11 23H2+ with latest Intel NPU Drivers |
+| **Intel NPU Driver** | 32.0.100.3104+ | Latest [Official Intel NPU Driver](https://www.intel.com/content/www/us/en/download/794734/intel-npu-driver-windows.html) |
 | **Optional dGPU** | NVIDIA RTX 3060+ | NVIDIA RTX 4070 / 5070 Ti (for dual-engine setups) |
 
 ---
@@ -134,13 +145,13 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Step 4: Obtain OpenVINO Model (or use LM Studio)
-To export Llama 3.2 3B to OpenVINO IR format:
-```bash
-pip install optimum-intel[openvino]
-optimum-cli export openvino --model meta-llama/Llama-3.2-3B-Instruct --weight-format int4 llama-3.2-3b-ov
-```
-*(Or download a pre-quantized OpenVINO model folder directly into `./llama-3.2-3b-ov`)*
+### Step 4: Model Acquisition (In-App Wizard or Manual)
+- **Option A (Recommended - 1-Click In-App Wizard)**: Start the app, open the **NPU Setup Wizard (⚡)** from the top bar, and click **Download** on any verified INT4 model (*Llama 3.2 3B*, *DeepSeek-R1 1.5B*, *TinyLlama 1.1B*, *Phi-4 Mini 3.8B*).
+- **Option B (CLI Conversion via Optimum Intel)**:
+  ```bash
+  pip install optimum-intel[openvino]
+  optimum-cli export openvino --model meta-llama/Llama-3.2-3B-Instruct --weight-format int4 llama-3.2-3b-ov
+  ```
 
 ---
 
@@ -175,6 +186,12 @@ Open your browser at **`http://localhost:7860`**.
 
 | Method | Endpoint | Description |
 |---|---|---|
+| `GET` | `/api/npu/diagnostics` | Full NPU hardware, driver, and active model integrity diagnostic report |
+| `GET` | `/api/npu/catalog` | List of pre-verified INT4 OpenVINO models for 1-click installation |
+| `GET` | `/api/npu/download_status` | Polling endpoint for active background model downloads |
+| `POST` | `/api/npu/download` | Trigger asynchronous download of an INT4 model from Hugging Face Hub |
+| `POST` | `/api/npu/test` | Run live dry-run NPU pipeline compilation and latency benchmark |
+| `POST` | `/api/npu/set_model_path` | Validate and switch active OpenVINO model directory |
 | `GET` | `/api/engine/status` | Current engine mode, NPU state, and LM Studio connectivity |
 | `POST` | `/api/engine/select` | Switch active engine (`openvino` vs `lmstudio`) |
 | `GET` | `/api/projects` | List all project workspaces with document and session stats |
@@ -195,16 +212,19 @@ Open your browser at **`http://localhost:7860`**.
 
 ## 🧪 Automated Test Suite
 
-Run the full automated test suite to verify NPU acceleration, LM Studio streaming, RAG vector retrieval, and session resumption:
+Run the full automated test suite to verify NPU diagnostics, guided wizard endpoints, LM Studio streaming, RAG vector retrieval, and session resumption:
 
 ```bash
-# Test 1: Project-Scoped RAG, Sessions & Memorization
+# Test 1: Intel NPU Guided Setup, Diagnostics & Model Catalog
+python test_npu_setup.py
+
+# Test 2: Project-Scoped RAG, Sessions & Memorization
 python test_projects_and_history.py
 
-# Test 2: LM Studio Dual-Engine Streaming & Reasoning
+# Test 3: LM Studio Dual-Engine Streaming & Reasoning
 python test_lmstudio_integration.py
 
-# Test 3: OpenVINO NPU RAG Pipeline Verification
+# Test 4: OpenVINO NPU RAG Pipeline Verification
 python test_rag_pipeline.py
 ```
 
