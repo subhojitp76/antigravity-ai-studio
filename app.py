@@ -30,6 +30,7 @@ except ImportError as e:
 
 # RAG & Project imports
 from rag import RAGEngine, ProjectManager
+from npu_setup import NPUDiagnostics, NPUModelDownloader, NPU_MODEL_CATALOG
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -39,6 +40,7 @@ MODEL_DIR_DEFAULT = BASE_DIR / "llama-3.2-3b-ov"
 
 # Initialize Project Manager (which handles project-scoped RAG engines and persistent sessions)
 project_mgr = ProjectManager(data_dir=str(DATA_DIR))
+npu_downloader = NPUModelDownloader(base_dir=str(BASE_DIR))
 
 
 # Global Model State Machine
@@ -99,14 +101,35 @@ class ModelManager:
         return devices
 
     def start_model(self, device="NPU", model_path=None, config=None):
+        target_model_path = model_path or self.model_path
+
+        # Perform proactive NPU pre-flight validation
+        if device.startswith("NPU"):
+            hw_info = NPUDiagnostics.get_hardware_info()
+            if not hw_info.get("has_npu"):
+                return {
+                    "success": False,
+                    "code": "needs_driver",
+                    "message": "Intel NPU device not detected by OpenVINO. Ensure Intel NPU driver is installed or use the Guided Setup Wizard.",
+                    "driver_url": hw_info.get("driver_url")
+                }
+
+            model_check = NPUDiagnostics.check_model_directory(target_model_path)
+            if not model_check.get("is_valid"):
+                return {
+                    "success": False,
+                    "code": "needs_model",
+                    "message": f"OpenVINO IR model directory '{target_model_path}' is missing or incomplete: {', '.join(model_check.get('missing_files', []))}. Please download a model via the Guided Setup Wizard.",
+                    "missing_files": model_check.get("missing_files", [])
+                }
+
         with self.lock:
             if self.state in [ModelState.LOADING, ModelState.READY, ModelState.GENERATING]:
                 return {"success": False, "message": f"Model is currently in '{self.state}' state."}
 
             self.state = ModelState.LOADING
             self.device = device
-            if model_path:
-                self.model_path = model_path
+            self.model_path = target_model_path
             if config:
                 self.config.update(config)
 
@@ -373,6 +396,18 @@ class StudioHTTPHandler(BaseHTTPRequestHandler):
             docs = rag.list_documents()
             self._send_json({"documents": docs, "total": len(docs), "project_id": p_id})
 
+        # --- NPU DIAGNOSTICS & SETUP API ---
+        elif path == "/api/npu/diagnostics":
+            model_p = query_params.get("model_path", [model_mgr.model_path])[0]
+            report = NPUDiagnostics.get_full_report(model_p)
+            self._send_json(report)
+
+        elif path == "/api/npu/catalog":
+            self._send_json({"catalog": NPU_MODEL_CATALOG})
+
+        elif path == "/api/npu/download_status":
+            self._send_json(npu_downloader.get_status())
+
         else:
             self.send_error(404, "Not Found")
 
@@ -414,6 +449,43 @@ class StudioHTTPHandler(BaseHTTPRequestHandler):
         elif path == "/api/model/stop":
             res = model_mgr.stop_model()
             self._send_json(res)
+
+        # --- NPU SETUP & DOWNLOAD API ---
+        elif path == "/api/npu/download":
+            model_id = req_data.get("model_id")
+            target_dir = req_data.get("target_dir")
+            if not model_id:
+                self._send_json({"error": "Missing model_id parameter."}, status=400)
+                return
+            res = npu_downloader.start_download(model_id, target_dir)
+            self._send_json(res)
+
+        elif path == "/api/npu/test":
+            model_p = req_data.get("model_path") or model_mgr.model_path
+            dev = req_data.get("device", "NPU")
+            res = NPUDiagnostics.test_npu_pipeline(model_p, device=dev)
+            self._send_json(res)
+
+        elif path == "/api/npu/set_model_path":
+            model_p = req_data.get("model_path")
+            if not model_p:
+                self._send_json({"error": "Missing model_path parameter."}, status=400)
+                return
+            check = NPUDiagnostics.check_model_directory(model_p)
+            if check.get("is_valid"):
+                model_mgr.model_path = model_p
+                self._send_json({
+                    "success": True, 
+                    "model_path": model_p, 
+                    "model_name": Path(model_p).name,
+                    "details": check
+                })
+            else:
+                self._send_json({
+                    "success": False, 
+                    "error": f"Model directory is invalid or missing weights: {', '.join(check.get('missing_files', []))}",
+                    "details": check
+                }, status=400)
 
         elif path == "/api/lmstudio/select_model":
             model_id = req_data.get("model")
