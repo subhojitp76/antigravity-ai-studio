@@ -131,20 +131,34 @@
     <div class="app-body">
       <!-- SIDEBAR WITH 3 WORKSPACE SECTIONS -->
       <aside class="app-sidebar" id="appSidebar">
+        <!-- SIDEBAR TOP HEADER WITH GUIDE TRIGGER -->
+        <div class="sidebar-header-bar">
+          <div class="sidebar-header-title">
+            <span class="sidebar-header-dot"></span>
+            <span>STUDIO NAVIGATION</span>
+          </div>
+          <button type="button" id="sidebarGuideBtn" class="sidebar-info-trigger" title="Open Left Navigation Features Guide" aria-label="Open Left Navigation Features Guide">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Nav Guide</span>
+          </button>
+        </div>
+
         <!-- 3 MAIN WORKSPACE TABS -->
-        <div class="workspace-tabs">
-          <button class="ws-tab-btn active" id="tabDirectChatBtn" data-tab="chat">
-            <span class="tab-icon">💬</span>
-            <span>Chat</span>
-          </button>
-          <button class="ws-tab-btn" id="tabProjectsBtn" data-tab="projects">
-            <span class="tab-icon">📁</span>
-            <span>Projects</span>
-          </button>
-          <button class="ws-tab-btn" id="tabHistoryBtn" data-tab="history">
-            <span class="tab-icon">🕒</span>
-            <span>History</span>
-          </button>
+        <div class="workspace-tabs-container">
+          <div class="workspace-tabs">
+            <button class="ws-tab-btn active" id="tabDirectChatBtn" data-tab="chat" title="Direct Chat with NPU/LM Studio">
+              <span class="tab-icon">💬</span>
+              <span>Chat</span>
+            </button>
+            <button class="ws-tab-btn" id="tabProjectsBtn" data-tab="projects" title="Project Knowledge Base & Documents">
+              <span class="tab-icon">📁</span>
+              <span>Projects</span>
+            </button>
+            <button class="ws-tab-btn" id="tabHistoryBtn" data-tab="history" title="Past Conversation History">
+              <span class="tab-icon">🕒</span>
+              <span>History</span>
+            </button>
+          </div>
         </div>
 
         <!-- TAB 1: DIRECT CHAT VIEW -->
@@ -152,7 +166,24 @@
           <!-- Session Header / Active Chat -->
           <div class="sidebar-section">
             <div class="section-title">
-              <span>Active Chat</span>
+              <div class="title-with-info">
+                <span>Active Chat</span>
+                <div class="info-tooltip-wrap" tabindex="0" role="button" aria-label="Active Chat info">
+                  <svg class="info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <div class="info-popover">
+                    <div class="info-popover-title">💬 Active Chat Session</div>
+                    <div class="info-popover-desc">
+                      Controls your current conversation thread. Auto-saves dialogue history with project & engine context.
+                    </div>
+                    <ul class="info-popover-list">
+                      <li><strong>New Chat:</strong> Starts a new thread & archives prior messages.</li>
+                      <li><strong>Save:</strong> Manually persists conversation to history.</li>
+                      <li><strong>Clear:</strong> Clears current view without deleting saved logs.</li>
+                      <li><strong>Export:</strong> Downloads full transcript with citations as Markdown (.md).</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <button id="newDirectChatBtn" class="btn-small" title="Start new conversation">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 New Chat
@@ -187,7 +218,22 @@
           <!-- RAG Status in Direct Chat -->
           <div class="sidebar-section">
             <div class="section-title">
-              <span>📚 Project Knowledge Base</span>
+              <div class="title-with-info">
+                <span>📚 Knowledge Base RAG</span>
+                <div class="info-tooltip-wrap" tabindex="0" role="button" aria-label="RAG Engine info">
+                  <svg class="info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <div class="info-popover">
+                    <div class="info-popover-title">📚 Retrieval-Augmented Generation</div>
+                    <div class="info-popover-desc">
+                      Injects semantically relevant document chunks from the active project into the model prompt to ground answers with verifiable citations.
+                    </div>
+                    <ul class="info-popover-list">
+                      <li><strong>RAG Toggle:</strong> Enables or disables document retrieval for the active chat.</li>
+                      <li><strong>Top-K Chunks:</strong> Controls how many relevant document excerpts are retrieved per question (1–6).</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <span class="rag-badge" id="ragStatusBadge">Active</span>
             </div>
             <!-- RAG Toggle -->
@@ -214,7 +260,24 @@
 
           <!-- GENERATION PARAMETERS -->
           <div class="sidebar-section">
-            <div class="section-title">Generation Parameters</div>
+            <div class="section-title">
+              <div class="title-with-info">
+                <span>Generation Parameters</span>
+                <div class="info-tooltip-wrap" tabindex="0" role="button" aria-label="Generation Parameters info">
+                  <svg class="info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <div class="info-popover">
+                    <div class="info-popover-title">⚙️ Inference Parameters</div>
+                    <div class="info-popover-desc">
+                      Tune the behavior and output length of the neural model:
+                    </div>
+                    <ul class="info-popover-list">
+                      <li><strong>Temperature:</strong> Lower values (0.1–0.4) yield precise, deterministic answers. Higher values (0.7–1.2) enable creative and conversational output.</li>
+                      <li><strong>Max New Tokens:</strong> Caps the response length to avoid runaway generation (64–2048 tokens).</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <div class="param-control">
               <div class="param-header">
@@ -240,7 +303,22 @@
           <!-- Active Project Selector & Creator -->
           <div class="sidebar-section">
             <div class="section-title">
-              <span>Project Workspace</span>
+              <div class="title-with-info">
+                <span>Project Workspace</span>
+                <div class="info-tooltip-wrap" tabindex="0" role="button" aria-label="Project Workspace info">
+                  <svg class="info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <div class="info-popover">
+                    <div class="info-popover-title">📁 Isolated Workspaces</div>
+                    <div class="info-popover-desc">
+                      Create dedicated workspaces for distinct research topics, codebases, or domains. Each project has its own isolated document vector store.
+                    </div>
+                    <ul class="info-popover-list">
+                      <li><strong>Switching:</strong> Instantly switch projects without unloading active models.</li>
+                      <li><strong>Isolation:</strong> Documents uploaded to one project are never mixed with others.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <button id="createProjectModalBtn" class="btn-small" title="Create a new project workspace">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 New Project
@@ -261,7 +339,22 @@
           <!-- Project Documents (RAG) -->
           <div class="sidebar-section">
             <div class="section-title">
-              <span>📄 Project Documents (<span id="docCount">0</span>)</span>
+              <div class="title-with-info">
+                <span>📄 Project Documents (<span id="docCount">0</span>)</span>
+                <div class="info-tooltip-wrap" tabindex="0" role="button" aria-label="Document Ingestion info">
+                  <svg class="info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <div class="info-popover">
+                    <div class="info-popover-title">📄 Document Ingestion</div>
+                    <div class="info-popover-desc">
+                      Files uploaded here are parsed, chunked, and indexed directly in this project's local knowledge base.
+                    </div>
+                    <ul class="info-popover-list">
+                      <li><strong>Supported:</strong> PDF, Markdown (.md), Text (.txt), CSV, JSON, Source code (.py, .js, .cpp, .rs, .java).</li>
+                      <li><strong>Drag & Drop:</strong> Drag files anywhere on the application window to upload instantly.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <button id="clearDocsBtn" class="btn-link" title="Clear all documents from this project">Clear All</button>
             </div>
 
@@ -282,7 +375,23 @@
           <!-- Project Actions (Close & Memorize Chat) -->
           <div class="sidebar-section">
             <div class="section-title">
-              <span>🧠 Knowledge Memorization</span>
+              <div class="title-with-info">
+                <span>🧠 Knowledge Memorization</span>
+                <div class="info-tooltip-wrap" tabindex="0" role="button" aria-label="Knowledge Memorization info">
+                  <svg class="info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <div class="info-popover">
+                    <div class="info-popover-title">🧠 Safe Knowledge Distillation</div>
+                    <div class="info-popover-desc">
+                      Distills your current conversation findings into permanent knowledge.
+                    </div>
+                    <ul class="info-popover-list">
+                      <li><strong>AI Summarization:</strong> Extracts key Q&A insights, solutions, and notes.</li>
+                      <li><strong>Review & Edit:</strong> You can edit the distilled notes before indexing.</li>
+                      <li><strong>RAG Indexing:</strong> Saves notes as a project document for future retrieval in subsequent chats.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
             <p class="memorize-hint">Finish conversation and distill insights into this project's permanent knowledge base.</p>
             <button id="memorizeChatBtn" class="btn btn-memorize">
@@ -296,7 +405,23 @@
         <div id="viewHistory" class="sidebar-tab-view">
           <div class="sidebar-section">
             <div class="section-title">
-              <span>Past Conversations</span>
+              <div class="title-with-info">
+                <span>Past Conversations</span>
+                <div class="info-tooltip-wrap" tabindex="0" role="button" aria-label="Chat History info">
+                  <svg class="info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <div class="info-popover">
+                    <div class="info-popover-title">🕒 Conversation History</div>
+                    <div class="info-popover-desc">
+                      Chronological history of all multi-turn conversation sessions across projects.
+                    </div>
+                    <ul class="info-popover-list">
+                      <li><strong>Instant Search:</strong> Live filter threads by title, project name, or keyword.</li>
+                      <li><strong>1-Click Resume:</strong> Click any card to restore the full conversation thread and citations.</li>
+                      <li><strong>Delete:</strong> Remove unwanted past chats.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <span class="history-count" id="historyCountBadge">0</span>
             </div>
 
@@ -756,6 +881,119 @@
               <span>🚀 Start Chatting on NPU</span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 5: LEFT NAVIGATION FEATURES GUIDE -->
+    <div class="modal-backdrop" id="sidebarGuideModal" style="display: none;">
+      <div class="modal-card modal-large modal-nav-guide">
+        <div class="modal-header">
+          <div class="modal-header-brand">
+            <div class="wizard-brand-icon" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));">ℹ️</div>
+            <div>
+              <h2 class="modal-title">Left Navigation & Studio Features Guide</h2>
+              <p class="modal-subtitle">Comprehensive guide to workspace tabs, Project RAG, history, and inference controls</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" id="closeSidebarGuideModal">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="guide-grid">
+            <!-- Feature 1: Chat Workspace -->
+            <div class="guide-feature-card">
+              <div class="gfc-header">
+                <span class="gfc-icon">💬</span>
+                <span class="gfc-title">Direct Chat Tab</span>
+                <span class="gfc-badge chat">Workspace</span>
+              </div>
+              <p class="gfc-desc">
+                Your primary conversation screen. Supports real-time token streaming with live TPS telemetry, reasoning thought processes (DeepSeek-R1), and Markdown code blocks.
+              </p>
+              <ul class="gfc-bullets">
+                <li><strong>New Chat:</strong> Starts a new thread & archives prior messages to history.</li>
+                <li><strong>Save:</strong> Explicitly commits current conversation to the database.</li>
+                <li><strong>Export:</strong> Downloads formatted Markdown (.md) including citation tables.</li>
+              </ul>
+            </div>
+
+            <!-- Feature 2: Project-Scoped RAG -->
+            <div class="guide-feature-card">
+              <div class="gfc-header">
+                <span class="gfc-icon">📁</span>
+                <span class="gfc-title">Project Workspaces & RAG</span>
+                <span class="gfc-badge rag">Knowledge Base</span>
+              </div>
+              <p class="gfc-desc">
+                Create isolated project spaces for separate topics (e.g. Research, Codebase, Finance). Documents in Project A are strictly isolated from Project B.
+              </p>
+              <ul class="gfc-bullets">
+                <li><strong>Document Ingestion:</strong> Ingest PDFs, Markdown, Text, CSV, JSON, and source code.</li>
+                <li><strong>Top-K Slider:</strong> Adjust the number of relevant document snippets injected per query.</li>
+                <li><strong>Verified Citations:</strong> Answers include clickable source pills with relevance scores.</li>
+              </ul>
+            </div>
+
+            <!-- Feature 3: Safe Knowledge Memorization -->
+            <div class="guide-feature-card">
+              <div class="gfc-header">
+                <span class="gfc-icon">🧠</span>
+                <span class="gfc-title">Safe Memorization & Distillation</span>
+                <span class="gfc-badge memo">AI Distillation</span>
+              </div>
+              <p class="gfc-desc">
+                Converts findings from your chat into permanent reference knowledge without polluting base model weights.
+              </p>
+              <ul class="gfc-bullets">
+                <li><strong>AI Summarization:</strong> Distills key discoveries, code fixes, and Q&A insights.</li>
+                <li><strong>Review & Edit:</strong> Review and refine distilled notes before indexing.</li>
+                <li><strong>Project Storage:</strong> Stores distilled notes into the project's vector store for future chat retrieval.</li>
+              </ul>
+            </div>
+
+            <!-- Feature 4: Persistent Chat History -->
+            <div class="guide-feature-card">
+              <div class="gfc-header">
+                <span class="gfc-icon">🕒</span>
+                <span class="gfc-title">Persistent Chat History</span>
+                <span class="gfc-badge history">Database</span>
+              </div>
+              <p class="gfc-desc">
+                All conversations are automatically indexed and searchable. Resume past sessions at any time with complete context.
+              </p>
+              <ul class="gfc-bullets">
+                <li><strong>Live Search:</strong> Instant filtering by title, project name, or message snippet.</li>
+                <li><strong>1-Click Resume:</strong> Restores full multi-turn conversation and citation history.</li>
+              </ul>
+            </div>
+
+            <!-- Feature 5: Inference Parameters -->
+            <div class="guide-feature-card full-width">
+              <div class="gfc-header">
+                <span class="gfc-icon">⚙️</span>
+                <span class="gfc-title">Generation & Inference Parameters</span>
+                <span class="gfc-badge params">Configuration</span>
+              </div>
+              <p class="gfc-desc">
+                Fine-tune response creativity, determinism, and token budget in real-time.
+              </p>
+              <div class="gfc-params-row">
+                <div class="gfc-param-item">
+                  <strong>Temperature (0.0 – 1.5):</strong>
+                  <span><code>0.1 – 0.3</code> for deterministic factual Q&A • <code>0.7</code> for balanced dialog • <code>1.0+</code> for creative brainstorming.</span>
+                </div>
+                <div class="gfc-param-item">
+                  <strong>Max New Tokens (64 – 2048):</strong>
+                  <span>Controls maximum response length per generation turn to prevent runaway generation.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="closeSidebarGuideBtn">Got it, Let's Chat</button>
         </div>
       </div>
     </div>
