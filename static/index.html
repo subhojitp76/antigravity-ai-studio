@@ -71,6 +71,12 @@
             <span class="status-text" id="statusText">Unloaded</span>
             <span class="loading-timer" id="loadingTimer" style="display: none;">(0.0s)</span>
           </div>
+
+          <!-- NPU SETUP WIZARD BUTTON -->
+          <button type="button" id="npuSetupWizardBtn" class="btn-npu-wizard" title="Launch Guided Intel NPU Setup & Diagnostics Wizard">
+            <span class="wizard-icon">⚡</span>
+            <span>NPU Setup</span>
+          </button>
         </div>
 
         <!-- LM Studio Controls -->
@@ -510,6 +516,246 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" id="cancelSettingsBtn">Cancel</button>
           <button class="btn btn-primary" id="saveSettingsBtn">Apply & Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: GUIDED INTEL NPU SETUP & DIAGNOSTICS WIZARD -->
+    <div class="modal-backdrop" id="npuWizardModal" style="display: none;">
+      <div class="modal-card modal-wizard">
+        <div class="modal-header">
+          <div class="modal-header-brand">
+            <div class="wizard-brand-icon">⚡</div>
+            <div>
+              <h2 class="modal-title">Intel® NPU Guided Setup & Diagnostics</h2>
+              <p class="modal-subtitle">Configure zero-CPU hardware acceleration on Intel® Core™ Ultra</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" id="closeNpuWizardModal">&times;</button>
+        </div>
+
+        <!-- WIZARD STEP NAVIGATION TABS -->
+        <div class="wizard-tabs">
+          <button type="button" class="wizard-tab active" data-step="1" id="wizardTab1">
+            <span class="w-step-num">1</span>
+            <span class="w-step-label">Hardware & Drivers</span>
+          </button>
+          <button type="button" class="wizard-tab" data-step="2" id="wizardTab2">
+            <span class="w-step-num">2</span>
+            <span class="w-step-label">Model Acquisition</span>
+          </button>
+          <button type="button" class="wizard-tab" data-step="3" id="wizardTab3">
+            <span class="w-step-num">3</span>
+            <span class="w-step-label">Pipeline Test</span>
+          </button>
+          <button type="button" class="wizard-tab" data-step="4" id="wizardTab4">
+            <span class="w-step-num">4</span>
+            <span class="w-step-label">CLI Guide</span>
+          </button>
+        </div>
+
+        <div class="modal-body wizard-body">
+          <!-- STEP 1: HARDWARE & DRIVER CHECK -->
+          <div class="wizard-step-view active" id="wizardStep1View">
+            <div class="step-intro">
+              <h3>System Hardware & NPU Driver Diagnostics</h3>
+              <p>Verify your processor and ensure the Intel(R) AI Boost neural processor driver is installed.</p>
+            </div>
+
+            <div class="diag-cards-grid">
+              <div class="diag-card" id="diagHwCard">
+                <div class="diag-card-header">
+                  <span class="diag-icon" id="diagHwIcon">⚡</span>
+                  <span class="diag-title">Intel® NPU Hardware</span>
+                  <span class="diag-status-badge" id="diagHwBadge">Checking...</span>
+                </div>
+                <div class="diag-detail" id="diagHwDetail">Probing OpenVINO hardware registry...</div>
+              </div>
+
+              <div class="diag-card" id="diagDriverCard">
+                <div class="diag-card-header">
+                  <span class="diag-icon" id="diagDriverIcon">🔌</span>
+                  <span class="diag-title">Intel NPU Driver</span>
+                  <span class="diag-status-badge" id="diagDriverBadge">Checking...</span>
+                </div>
+                <div class="diag-detail" id="diagDriverDetail">Validating neural driver status...</div>
+              </div>
+
+              <div class="diag-card" id="diagOvCard">
+                <div class="diag-card-header">
+                  <span class="diag-icon">⚙️</span>
+                  <span class="diag-title">OpenVINO™ GenAI</span>
+                  <span class="diag-status-badge success" id="diagOvBadge">Installed</span>
+                </div>
+                <div class="diag-detail" id="diagOvDetail">OpenVINO runtime loaded</div>
+              </div>
+            </div>
+
+            <!-- Driver Installation Guidance Banner -->
+            <div class="driver-guide-box" id="driverGuideBox" style="display: none;">
+              <div class="guide-box-header">
+                <span class="guide-icon">📥</span>
+                <h4>Intel NPU Driver Installation Required</h4>
+              </div>
+              <p>If your PC has an Intel Core Ultra processor (Series 1 or Series 2) but NPU is not detected, download and install the official Intel NPU Driver:</p>
+              <div class="guide-actions-row">
+                <a href="https://www.intel.com/content/www/us/en/download/794734/intel-npu-driver-windows.html" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
+                  <span>⬇️ Download Intel NPU Driver (.exe)</span>
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" id="recheckHwBtn">
+                  <span>🔄 Refresh Hardware Check</span>
+                </button>
+              </div>
+              <div class="devmgmt-tip">
+                💡 <strong>Device Manager Verification:</strong> Press <kbd>Win + X</kbd> → <em>Device Manager</em> → expand <em>"Neural Processors"</em> → verify <strong>Intel(R) AI Boost</strong> is present without exclamation marks.
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 2: MODEL SELECTION & 1-CLICK DOWNLOAD -->
+          <div class="wizard-step-view" id="wizardStep2View">
+            <div class="step-intro">
+              <h3>Model Acquisition & Setup</h3>
+              <p>Select a pre-converted INT4 OpenVINO model for 1-click download, or link your own local model folder.</p>
+            </div>
+
+            <!-- Download Progress Card (Live) -->
+            <div class="download-progress-card" id="downloadProgressCard" style="display: none;">
+              <div class="dpc-header">
+                <div class="dpc-info">
+                  <span class="dpc-title" id="dpcModelName">Downloading Model...</span>
+                  <span class="dpc-status" id="dpcStatusText">Connecting to Hugging Face...</span>
+                </div>
+                <span class="dpc-pct" id="dpcPctText">0%</span>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="dpcProgressBar" style="width: 0%;"></div>
+              </div>
+              <div class="dpc-footer">
+                <span id="dpcBytesText">0 MB / 0 MB</span>
+                <span id="dpcSpeedText">-- MB/s</span>
+              </div>
+            </div>
+
+            <!-- Model Presets Grid -->
+            <div class="model-catalog-grid" id="modelCatalogGrid">
+              <!-- Dynamically populated from /api/npu/catalog -->
+            </div>
+
+            <!-- Custom Model Path Section -->
+            <div class="custom-model-box">
+              <div class="custom-model-header">
+                <label for="customModelPathInput">Or link a custom OpenVINO IR model folder on disk:</label>
+              </div>
+              <div class="custom-model-input-row">
+                <input type="text" id="customModelPathInput" class="form-input" placeholder="e.g. C:\AI_Models\llama-3.2-3b-ov or ./llama-3.2-3b-ov">
+                <button type="button" id="validateCustomPathBtn" class="btn btn-secondary">
+                  <span>Validate & Set</span>
+                </button>
+              </div>
+              <div class="custom-path-feedback" id="customPathFeedback"></div>
+            </div>
+          </div>
+
+          <!-- STEP 3: NPU PIPELINE DRY-RUN BENCHMARK -->
+          <div class="wizard-step-view" id="wizardStep3View">
+            <div class="step-intro">
+              <h3>Validate NPU Pipeline</h3>
+              <p>Perform a test compilation and warm-up generation directly on your Intel NPU to confirm 100% readiness.</p>
+            </div>
+
+            <div class="test-bench-card">
+              <div class="test-config-row">
+                <div class="test-target-info">
+                  <span class="tt-label">Active Model:</span>
+                  <span class="tt-val" id="testActiveModelPath">llama-3.2-3b-ov</span>
+                </div>
+                <button type="button" id="runNpuTestBtn" class="btn btn-primary">
+                  <span class="btn-icon">⚡</span>
+                  <span class="btn-text">Run NPU Hardware Test</span>
+                </button>
+              </div>
+
+              <!-- Live Test Result Output -->
+              <div class="test-result-box" id="testResultBox" style="display: none;">
+                <div class="test-metrics-row">
+                  <div class="test-metric-pill">
+                    <span class="tm-lbl">Compilation Time:</span>
+                    <span class="tm-val" id="testCompileTime">--</span>
+                  </div>
+                  <div class="test-metric-pill">
+                    <span class="tm-lbl">Target Device:</span>
+                    <span class="tm-val highlight" id="testDevice">NPU</span>
+                  </div>
+                  <div class="test-metric-pill">
+                    <span class="tm-lbl">Generation Latency:</span>
+                    <span class="tm-val" id="testGenTime">--</span>
+                  </div>
+                </div>
+                <div class="test-output-wrap">
+                  <span class="to-label">NPU Generated Response:</span>
+                  <div class="to-text" id="testOutputText">--</div>
+                </div>
+                <div class="test-success-banner" id="testSuccessBanner">
+                  🎉 <strong>NPU Hardware Validation Passed!</strong> Your model is compiled and ready for zero-CPU inference.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 4: MANUAL CLI EXPORT GUIDE -->
+          <div class="wizard-step-view" id="wizardStep4View">
+            <div class="step-intro">
+              <h3>Manual Model Export Guide (Hugging Face Optimum)</h3>
+              <p>You can convert any Hugging Face model to OpenVINO INT4 format on your command line:</p>
+            </div>
+
+            <div class="cli-guide-content">
+              <div class="cli-step">
+                <span class="cli-step-num">1</span>
+                <div class="cli-step-desc">
+                  <strong>Install Optimum Intel with OpenVINO support:</strong>
+                  <div class="code-snippet-row">
+                    <code>pip install optimum[openvino] nncf</code>
+                    <button type="button" class="btn-copy-code" data-copy="pip install optimum[openvino] nncf" title="Copy Command">Copy</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cli-step">
+                <span class="cli-step-num">2</span>
+                <div class="cli-step-desc">
+                  <strong>Export Llama 3.2 3B in INT4 precision:</strong>
+                  <div class="code-snippet-row">
+                    <code>optimum-cli export openvino --model meta-llama/Llama-3.2-3B-Instruct --weight-format int4 llama-3.2-3b-ov</code>
+                    <button type="button" class="btn-copy-code" data-copy="optimum-cli export openvino --model meta-llama/Llama-3.2-3B-Instruct --weight-format int4 llama-3.2-3b-ov" title="Copy Command">Copy</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cli-step">
+                <span class="cli-step-num">3</span>
+                <div class="cli-step-desc">
+                  <strong>Export DeepSeek-R1 Distill Qwen 1.5B in INT4:</strong>
+                  <div class="code-snippet-row">
+                    <code>optimum-cli export openvino --model deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B --weight-format int4 deepseek-r1-1.5b-ov</code>
+                    <button type="button" class="btn-copy-code" data-copy="optimum-cli export openvino --model deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B --weight-format int4 deepseek-r1-1.5b-ov" title="Copy Command">Copy</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer wizard-footer">
+          <button type="button" class="btn btn-secondary" id="wizardPrevBtn" style="display: none;">Back</button>
+          <div class="wizard-footer-right">
+            <button type="button" class="btn btn-secondary" id="closeNpuWizardBtn">Close</button>
+            <button type="button" class="btn btn-primary" id="wizardNextBtn">Next Step →</button>
+            <button type="button" class="btn btn-start" id="wizardFinishBtn" style="display: none;">
+              <span>🚀 Start Chatting on NPU</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
